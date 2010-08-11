@@ -1,6 +1,6 @@
 package Dist::Zilla::Plugin::SvnObtain;
 BEGIN {
-  $Dist::Zilla::Plugin::SvnObtain::VERSION = '0.01';
+  $Dist::Zilla::Plugin::SvnObtain::VERSION = '0.02';
 }
 # ABSTRACT: obtain files from a subversion repository before building a distribution
 
@@ -57,6 +57,7 @@ sub BUILDARGS {
 sub before_build {
     my $self = shift;
 
+    my $svn = SVN::Client->new;
     if (-d $self->svn_dir) {
         $self->log("using existing directory " . $self->svn_dir);
     } else {
@@ -67,9 +68,23 @@ sub before_build {
     chdir($self->svn_dir) or die "Can't change to the " . $self->svn_dir . " directory -- $!";
     for my $project (keys %{$self->_repos}) {
         my ($url,$rev) = map { $self->_repos->{$project}{$_} } qw/url rev/;
-        $self->log("checking out $project revision $rev");
-        my $svn = SVN::Client->new;
-        $svn->checkout($url, $project, $rev, 1);
+        if (-d $project) {
+            if (-e "$project/.svn") {
+                my $wc_info;
+                $svn->info($project, undef, undef, sub { $wc_info = $_[1] }, 0);
+                if ($wc_info->URL eq $url) {
+                    $self->log("updating $project to revision $rev");
+                    $svn->update($project,$rev,1);
+                } else {
+                    die "$project directory is not an SVN repository for $url (" .$wc_info->URL . ")";
+                }
+            } else {
+                die "$project directory already exists and is not an SVN repository";
+            }
+        } else {
+            $self->log("checking out $project revision $rev");
+            $svn->checkout($url, $project, $rev, 1);
+        }
     }
     chdir($prev_dir) or die "Can't change back to the $prev_dir directory -- $!";
 }
@@ -87,15 +102,15 @@ Dist::Zilla::Plugin::SvnObtain - obtain files from a subversion repository befor
 
 =head1 VERSION
 
-version 0.01
+version 0.02
 
 =head1 SYNOPSIS
 
 In your F<dist.ini>:
 
   [SvnObtain]
-    ;subdir = url                                   revision
-    parrot  = https://svn.parrot.org/parrot/trunk   48152
+    ;subdir = url                                       revision
+    simile = http://simile-widgets.googlecode.com/svn   1870
 
   [SvnObtain/path/to/some/other/dir]
     blah = http://svn.example.com/repos/my-project
@@ -136,6 +151,14 @@ the path will be created as necessary. Once the directory
 F<libs/javascript> exists, project directories will be created within it
 for F<jquery> and F<simile>. The F<jquery> checkout will be at the HEAD
 revision and the F<simile> checkout will be at revision 2100.
+
+If a directory already exists with the same name as the project directory,
+L<Dist::Zilla::Plugin::SvnObtain> will attempt to re-use the directory
+if it contains a working copy of a subversion repository that is the same
+URL as the one specified for that project directory within F<dist.ini>. 
+If the directory is not a subversion working copy or the URL is different,
+L<Dist::Zilla::Plugin::SvnObtain> will cause L<Dist::Zilla> to exit with
+an appropriate error message.
 
 =head1 AUTHOR
 

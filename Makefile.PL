@@ -25,12 +25,12 @@ my %WriteMakefileArgs = (
     'Cwd' => '0',
     'Dist::Zilla::Role::BeforeBuild' => '0',
     'Dist::Zilla::Role::Plugin' => '0',
-    'File::Path' => '2.00',
+    'File::Path' => '2.08',
     'Moose' => '0',
     'SVN::Client' => '0',
     'namespace::autoclean' => '0'
   },
-  'VERSION' => '0.01',
+  'VERSION' => '0.02',
   'test' => {
     'TESTS' => 't/*.t'
   }
